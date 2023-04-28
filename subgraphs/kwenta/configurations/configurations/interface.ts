@@ -5,9 +5,5 @@ export interface Configurations {
   getProtocolName(): string;
   getProtocolSlug(): string;
   getFactoryAddress(): Address;
-  getDaiAddress(): Address;
-  getVaultAddress(): Address;
-  getStorageAddress(): Address;
-  getPairInfoAddress(): Address;
-  getPairStorageAddress(): Address;
+  getSUSDAddress(): Address;
 }

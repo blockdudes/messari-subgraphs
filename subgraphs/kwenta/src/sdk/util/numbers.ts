@@ -1,4 +1,5 @@
 import { BigDecimal, BigInt } from "@graphprotocol/graph-ts";
+
 import { BIGDECIMAL_ZERO } from "./constants";
 
 export function bigIntToBigDecimal(

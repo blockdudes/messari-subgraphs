@@ -1,108 +1,5 @@
 [
   {
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "_resolver",
-        "type": "address"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "_baseAsset",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "_marketKey",
-        "type": "bytes32"
-      }
-    ],
-    "payable": false,
-    "stateMutability": "nonpayable",
-    "type": "constructor"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "name",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "address",
-        "name": "destination",
-        "type": "address"
-      }
-    ],
-    "name": "CacheUpdated",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": false,
-        "internalType": "int256",
-        "name": "funding",
-        "type": "int256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "index",
-        "type": "uint256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "timestamp",
-        "type": "uint256"
-      }
-    ],
-    "name": "FundingRecomputed",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "trackingCode",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "baseAsset",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "bytes32",
-        "name": "marketKey",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "int256",
-        "name": "sizeDelta",
-        "type": "int256"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "fee",
-        "type": "uint256"
-      }
-    ],
-    "name": "FuturesTracking",
-    "type": "event"
-  },
-  {
     "anonymous": false,
     "inputs": [
       {
@@ -113,22 +10,9 @@
       },
       {
         "indexed": false,
-        "internalType": "int256",
-        "name": "marginDelta",
-        "type": "int256"
-      }
-    ],
-    "name": "MarginTransferred",
-    "type": "event"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "account",
-        "type": "address"
+        "internalType": "bool",
+        "name": "isOffchain",
+        "type": "bool"
       },
       {
         "indexed": false,
@@ -167,7 +51,7 @@
         "type": "bytes32"
       }
     ],
-    "name": "NextPriceOrderRemoved",
+    "name": "DelayedOrderRemoved",
     "type": "event"
   },
   {
@@ -181,6 +65,12 @@
       },
       {
         "indexed": false,
+        "internalType": "bool",
+        "name": "isOffchain",
+        "type": "bool"
+      },
+      {
+        "indexed": false,
         "internalType": "int256",
         "name": "sizeDelta",
         "type": "int256"
@@ -189,6 +79,18 @@
         "indexed": false,
         "internalType": "uint256",
         "name": "targetRoundId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "intentionTime",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "executableAtTime",
         "type": "uint256"
       },
       {
@@ -210,7 +112,38 @@
         "type": "bytes32"
       }
     ],
-    "name": "NextPriceOrderSubmitted",
+    "name": "DelayedOrderSubmitted",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "funding",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "fundingRate",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "timestamp",
+        "type": "uint256"
+      }
+    ],
+    "name": "FundingRecomputed",
     "type": "event"
   },
   {
@@ -218,18 +151,74 @@
     "inputs": [
       {
         "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
         "internalType": "address",
         "name": "account",
         "type": "address"
       },
       {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "marginDelta",
+        "type": "int256"
+      }
+    ],
+    "name": "MarginTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
         "indexed": true,
+        "internalType": "bytes32",
+        "name": "trackingCode",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "baseAsset",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "bytes32",
+        "name": "marketKey",
+        "type": "bytes32"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "sizeDelta",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      }
+    ],
+    "name": "PerpsTracking",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": false,
         "internalType": "address",
         "name": "liquidator",
         "type": "address"
@@ -250,6 +239,61 @@
         "indexed": false,
         "internalType": "uint256",
         "name": "fee",
+        "type": "uint256"
+      }
+    ],
+    "name": "PositionLiquidated",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "address",
+        "name": "liquidator",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "size",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "price",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "flaggerFee",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "liquidatorFee",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "stakersFee",
         "type": "uint256"
       }
     ],
@@ -306,6 +350,67 @@
         "internalType": "uint256",
         "name": "fee",
         "type": "uint256"
+      }
+    ],
+    "name": "PositionModified",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "margin",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "size",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "tradeSize",
+        "type": "int256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "lastPrice",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fundingIndex",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "fee",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "int256",
+        "name": "skew",
+        "type": "int256"
       }
     ],
     "name": "PositionModified",
@@ -390,7 +495,7 @@
     "outputs": [
       {
         "internalType": "bytes32",
-        "name": "",
+        "name": "key",
         "type": "bytes32"
       }
     ],
@@ -428,7 +533,7 @@
         "type": "address"
       }
     ],
-    "name": "cancelNextPriceOrder",
+    "name": "cancelDelayedOrder",
     "outputs": [],
     "payable": false,
     "stateMutability": "nonpayable",
@@ -436,7 +541,28 @@
   },
   {
     "constant": false,
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "cancelOffchainDelayedOrder",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "priceImpactDelta",
+        "type": "uint256"
+      }
+    ],
     "name": "closePosition",
     "outputs": [],
     "payable": false,
@@ -446,6 +572,11 @@
   {
     "constant": false,
     "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "priceImpactDelta",
+        "type": "uint256"
+      },
       {
         "internalType": "bytes32",
         "name": "trackingCode",
@@ -465,8 +596,91 @@
     "outputs": [
       {
         "internalType": "int256",
-        "name": "",
+        "name": "fundingRate",
         "type": "int256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "currentFundingVelocity",
+    "outputs": [
+      {
+        "internalType": "int256",
+        "name": "fundingVelocity",
+        "type": "int256"
+      }
+    ],
+    "payable": false,
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "delayedOrders",
+    "outputs": [
+      {
+        "components": [
+          {
+            "internalType": "bool",
+            "name": "isOffchain",
+            "type": "bool"
+          },
+          {
+            "internalType": "int128",
+            "name": "sizeDelta",
+            "type": "int128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "priceImpactDelta",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "targetRoundId",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "commitDeposit",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "keeperDeposit",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint256",
+            "name": "executableAtTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "intentionTime",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "trackingCode",
+            "type": "bytes32"
+          }
+        ],
+        "internalType": "struct IPerpsV2MarketConsolidated.DelayedOrder",
+        "name": "",
+        "type": "tuple"
       }
     ],
     "payable": false,
@@ -482,10 +696,30 @@
         "type": "address"
       }
     ],
-    "name": "executeNextPriceOrder",
+    "name": "executeDelayedOrder",
     "outputs": [],
     "payable": false,
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      },
+      {
+        "internalType": "bytes[]",
+        "name": "priceUpdateData",
+        "type": "bytes[]"
+      }
+    ],
+    "name": "executeOffchainDelayedOrder",
+    "outputs": [],
+    "payable": true,
+    "stateMutability": "payable",
     "type": "function"
   },
   {
@@ -495,7 +729,7 @@
     "outputs": [
       {
         "internalType": "uint32",
-        "name": "",
+        "name": "timestamp",
         "type": "uint32"
       }
     ],
@@ -508,7 +742,7 @@
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "index",
         "type": "uint256"
       }
     ],
@@ -516,7 +750,7 @@
     "outputs": [
       {
         "internalType": "int128",
-        "name": "",
+        "name": "netFunding",
         "type": "int128"
       }
     ],
@@ -531,23 +765,8 @@
     "outputs": [
       {
         "internalType": "uint256",
-        "name": "",
+        "name": "length",
         "type": "uint256"
-      }
-    ],
-    "payable": false,
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "constant": true,
-    "inputs": [],
-    "name": "isResolverCached",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
       }
     ],
     "payable": false,
@@ -628,7 +847,7 @@
       },
       {
         "internalType": "bool",
-        "name": "invalid",
+        "name": "isInvalid",
         "type": "bool"
       }
     ],
@@ -643,7 +862,7 @@
     "outputs": [
       {
         "internalType": "bytes32",
-        "name": "",
+        "name": "key",
         "type": "bytes32"
       }
     ],
@@ -658,7 +877,7 @@
     "outputs": [
       {
         "internalType": "uint128",
-        "name": "",
+        "name": "size",
         "type": "uint128"
       }
     ],
@@ -693,7 +912,7 @@
     "outputs": [
       {
         "internalType": "int128",
-        "name": "",
+        "name": "skew",
         "type": "int128"
       }
     ],
@@ -708,6 +927,11 @@
         "internalType": "int256",
         "name": "sizeDelta",
         "type": "int256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "priceImpactDelta",
+        "type": "uint256"
       }
     ],
     "name": "modifyPosition",
@@ -725,6 +949,11 @@
         "type": "int256"
       },
       {
+        "internalType": "uint256",
+        "name": "priceImpactDelta",
+        "type": "uint256"
+      },
+      {
         "internalType": "bytes32",
         "name": "trackingCode",
         "type": "bytes32"
@@ -734,47 +963,6 @@
     "outputs": [],
     "payable": false,
     "stateMutability": "nonpayable",
-    "type": "function"
-  },
-  {
-    "constant": true,
-    "inputs": [
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "nextPriceOrders",
-    "outputs": [
-      {
-        "internalType": "int128",
-        "name": "sizeDelta",
-        "type": "int128"
-      },
-      {
-        "internalType": "uint128",
-        "name": "targetRoundId",
-        "type": "uint128"
-      },
-      {
-        "internalType": "uint128",
-        "name": "commitDeposit",
-        "type": "uint128"
-      },
-      {
-        "internalType": "uint128",
-        "name": "keeperDeposit",
-        "type": "uint128"
-      },
-      {
-        "internalType": "bytes32",
-        "name": "trackingCode",
-        "type": "bytes32"
-      }
-    ],
-    "payable": false,
-    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -810,6 +998,11 @@
         "internalType": "int256",
         "name": "sizeDelta",
         "type": "int256"
+      },
+      {
+        "internalType": "enum IPerpsV2MarketBaseTypes.OrderType",
+        "name": "orderType",
+        "type": "uint8"
       }
     ],
     "name": "orderFee",
@@ -834,36 +1027,43 @@
     "inputs": [
       {
         "internalType": "address",
-        "name": "",
+        "name": "account",
         "type": "address"
       }
     ],
     "name": "positions",
     "outputs": [
       {
-        "internalType": "uint64",
-        "name": "id",
-        "type": "uint64"
-      },
-      {
-        "internalType": "uint64",
-        "name": "lastFundingIndex",
-        "type": "uint64"
-      },
-      {
-        "internalType": "uint128",
-        "name": "margin",
-        "type": "uint128"
-      },
-      {
-        "internalType": "uint128",
-        "name": "lastPrice",
-        "type": "uint128"
-      },
-      {
-        "internalType": "int128",
-        "name": "size",
-        "type": "int128"
+        "components": [
+          {
+            "internalType": "uint64",
+            "name": "id",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "lastFundingIndex",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint128",
+            "name": "margin",
+            "type": "uint128"
+          },
+          {
+            "internalType": "uint128",
+            "name": "lastPrice",
+            "type": "uint128"
+          },
+          {
+            "internalType": "int128",
+            "name": "size",
+            "type": "int128"
+          }
+        ],
+        "internalType": "struct IPerpsV2MarketConsolidated.Position",
+        "name": "",
+        "type": "tuple"
       }
     ],
     "payable": false,
@@ -877,6 +1077,16 @@
         "internalType": "int256",
         "name": "sizeDelta",
         "type": "int256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "tradePrice",
+        "type": "uint256"
+      },
+      {
+        "internalType": "enum IPerpsV2MarketBaseTypes.OrderType",
+        "name": "orderType",
+        "type": "uint8"
       },
       {
         "internalType": "address",
@@ -912,7 +1122,7 @@
         "type": "uint256"
       },
       {
-        "internalType": "enum IFuturesMarketBaseTypes.Status",
+        "internalType": "enum IPerpsV2MarketConsolidated.Status",
         "name": "status",
         "type": "uint8"
       }
@@ -945,15 +1155,6 @@
     ],
     "payable": false,
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "constant": false,
-    "inputs": [],
-    "name": "rebuildCache",
-    "outputs": [],
-    "payable": false,
-    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -998,45 +1199,25 @@
     "type": "function"
   },
   {
-    "constant": true,
-    "inputs": [],
-    "name": "resolver",
-    "outputs": [
-      {
-        "internalType": "contract AddressResolver",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "payable": false,
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "constant": true,
-    "inputs": [],
-    "name": "resolverAddressesRequired",
-    "outputs": [
-      {
-        "internalType": "bytes32[]",
-        "name": "addresses",
-        "type": "bytes32[]"
-      }
-    ],
-    "payable": false,
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "constant": false,
     "inputs": [
       {
         "internalType": "int256",
         "name": "sizeDelta",
         "type": "int256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "priceImpactDelta",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "desiredTimeDelta",
+        "type": "uint256"
       }
     ],
-    "name": "submitNextPriceOrder",
+    "name": "submitDelayedOrder",
     "outputs": [],
     "payable": false,
     "stateMutability": "nonpayable",
@@ -1051,12 +1232,67 @@
         "type": "int256"
       },
       {
+        "internalType": "uint256",
+        "name": "priceImpactDelta",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "desiredTimeDelta",
+        "type": "uint256"
+      },
+      {
         "internalType": "bytes32",
         "name": "trackingCode",
         "type": "bytes32"
       }
     ],
-    "name": "submitNextPriceOrderWithTracking",
+    "name": "submitDelayedOrderWithTracking",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "internalType": "int256",
+        "name": "sizeDelta",
+        "type": "int256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "priceImpactDelta",
+        "type": "uint256"
+      }
+    ],
+    "name": "submitOffchainDelayedOrder",
+    "outputs": [],
+    "payable": false,
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "constant": false,
+    "inputs": [
+      {
+        "internalType": "int256",
+        "name": "sizeDelta",
+        "type": "int256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "priceImpactDelta",
+        "type": "uint256"
+      },
+      {
+        "internalType": "bytes32",
+        "name": "trackingCode",
+        "type": "bytes32"
+      }
+    ],
+    "name": "submitOffchainDelayedOrderWithTracking",
     "outputs": [],
     "payable": false,
     "stateMutability": "nonpayable",
@@ -1105,30 +1341,5 @@
     "payable": false,
     "stateMutability": "nonpayable",
     "type": "function"
-  },
-  {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "marketKey",
-        "type": "bytes32"
-      },
-      {
-        "indexed": true,
-        "internalType": "bytes32",
-        "name": "parameter",
-        "type": "bytes32"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint256",
-        "name": "value",
-        "type": "uint256"
-      }
-    ],
-    "name": "ParameterUpdated",
-    "type": "event"
   }
 ]
