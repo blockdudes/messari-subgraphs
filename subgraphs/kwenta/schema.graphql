@@ -867,7 +867,7 @@ type LiquidityPool @entity {
 ##### Pool-Level Timeseries #####
 #################################
 
-type LiquidityPoolDailySnapshot @entity(immutable: true) {
+type LiquidityPoolDailySnapshot @entity {
   " { Smart contract address of the pool }-{ # of days since Unix epoch time } "
   id: Bytes!
 
@@ -1105,7 +1105,7 @@ type LiquidityPoolDailySnapshot @entity(immutable: true) {
   rewardTokenEmissionsUSD: [BigDecimal!]
 }
 
-type LiquidityPoolHourlySnapshot @entity(immutable: true) {
+type LiquidityPoolHourlySnapshot @entity {
   " { Smart contract address of the pool }-{ # of hours since Unix epoch time } "
   id: Bytes!
 
@@ -1863,6 +1863,12 @@ type Position @entity {
 
   " Position daily snapshots for open positions "
   snapshots: [PositionSnapshot!]! @derivedFrom(field: "position")
+
+  price: BigInt!
+
+  fundingIndex: BigInt!
+
+  size: BigInt!
 }
 
 type PositionSnapshot @entity(immutable: true) {
@@ -1938,4 +1944,16 @@ type _PositionCounter @entity {
 
   " Next count "
   nextCount: Int!
+}
+
+type _SmartMarginAccount @entity {
+  id: ID!
+  owner: Account!
+  version: Bytes!
+}
+
+type _FundingRate @entity {
+  id: Bytes!
+
+  funding: BigInt!
 }

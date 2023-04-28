@@ -5,7 +5,19 @@
     {
       "name": "FuturesMarketManager1",
       "address": "0xc704c9AA89d1ca60F67B3075d05fBb92b3B00B3B",
-      "startBlock": "4552546"
+      "startBlock": 4552546
+    }
+  ],
+  "smartMarginFactory": [
+    {
+      "name": "SmartMarginFactory1",
+      "address": "0xf1BC9852e89e0b6ABa81548A10c0afF9ACa95CaA",
+      "startBlock": 89109827
+    },
+    {
+      "name": "SmartMarginFactory2",
+      "address": "0x8234F990b149Ae59416dc260305E565e5DAfEb54",
+      "startBlock": 92005505
     }
   ],
   "graftEnabled": false,
