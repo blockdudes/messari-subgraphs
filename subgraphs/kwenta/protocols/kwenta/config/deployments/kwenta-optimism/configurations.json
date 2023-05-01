@@ -8,6 +8,18 @@
       "startBlock": 4552546
     }
   ],
+  "marketManagerV2": [
+    {
+      "name": "FuturesMarketManager2",
+      "address": "0xdb89f3fc45A707Dd49781495f77f8ae69bF5cA6e",
+      "startBlock": 52456507
+    },
+    {
+      "name": "FuturesMarketManager3",
+      "address": "0xd30bdfd7e7a65fe109d5de1d4e95f3b800fb7463",
+      "startBlock": 86524190
+    }
+  ],
   "smartMarginFactory": [
     {
       "name": "SmartMarginFactory1",

@@ -14,6 +14,7 @@ import {
   BigInt,
   Bytes,
   dataSource,
+  ethereum,
   log,
 } from "@graphprotocol/graph-ts";
 import { getUsdPrice, getUsdPricePerToken } from "../prices";
@@ -44,8 +45,8 @@ import {
   PositionModified as PositionModifiedEvent,
 } from "../../generated/templates/FuturesV1Market/FuturesMarket";
 import {
-  PositionLiquidated as PositionLiquidatedV2Event,
-  PositionModified as PositionModifiedV2Event,
+  PositionLiquidated1 as PositionLiquidatedV2Event,
+  PositionModified1 as PositionModifiedV2Event,
 } from "../../generated/templates/PerpsV2Market/PerpsV2MarketProxyable";
 import { FuturesV1Market, PerpsV2Market } from "../../generated/templates";
 import { createTokenAmountArray, getFundingRateId } from "./helpers";
@@ -86,6 +87,10 @@ const conf = new ProtocolConfig(
   Versions
 );
 
+/*
+  This function is called when a new v1 market added
+  We just checks if it is a v1 market, and then stores it 
+*/
 export function handleV1MarketAdded(event: MarketAddedEvent): void {
   const marketKey = event.params.marketKey.toString();
   const sdk = SDK.initializeFromEvent(
@@ -110,6 +115,11 @@ export function handleV1MarketAdded(event: MarketAddedEvent): void {
     FuturesV1Market.create(event.params.market);
   }
 }
+
+/*
+  This function is called when a new v2 market added
+  We just checks if it is a v2 market, and then stores it 
+*/
 export function handleV2MarketAdded(event: MarketAddedEvent): void {
   const marketKey = event.params.marketKey.toString();
   const sdk = SDK.initializeFromEvent(
@@ -135,7 +145,11 @@ export function handleV2MarketAdded(event: MarketAddedEvent): void {
   }
 }
 
-export function handleNewAccountSmartMarge(
+/*
+  This function is fired when a new smart margin account is created.
+  We are storing the new smart margin account with it's owner address for future reference.
+*/
+export function handleNewAccountSmartMargin(
   event: NewSmartMarginAccountEvent
 ): void {
   // create a new entity to store the cross-margin account owner
@@ -162,6 +176,10 @@ export function handleNewAccountSmartMarge(
   }
 }
 
+/*
+ This function is fired when a Margin (Collateral) is transferred from or to a market position of an account.
+ If marginDelta > 0 then it is "collateral in", else it is "collateral out".
+*/
 export function handleMarginTransferred(event: MarginTransferredEvent): void {
   let marketAddress = dataSource.address();
   const marginDelta = event.params.marginDelta;
@@ -185,6 +203,7 @@ export function handleMarginTransferred(event: MarginTransferredEvent): void {
   }
   const amounts = createTokenAmountArray(pool, [token], [marginDelta.abs()]);
 
+  // loading the last position of the account in this pool, if no position exists create a new one
   const position = sdk.Positions.loadPosition(
     pool,
     account,
@@ -194,12 +213,15 @@ export function handleMarginTransferred(event: MarginTransferredEvent): void {
     null,
     true
   );
+
+  // Collateral In
   if (marginDelta.gt(BIGINT_ZERO)) {
     account.collateralIn(pool, position.getBytesID(), amounts, BIGINT_ZERO);
     position.addCollateralInCount();
     pool.addInflowVolumeByToken(token, marginDelta.abs());
     pool.addVolumeByToken(token, marginDelta.abs());
   }
+  // Collateral Out
   if (marginDelta.lt(BIGINT_ZERO)) {
     account.collateralOut(pool, position.getBytesID(), amounts, BIGINT_ZERO);
     position.addCollateralOutCount();
@@ -207,6 +229,11 @@ export function handleMarginTransferred(event: MarginTransferredEvent): void {
     pool.addVolumeByToken(token, marginDelta.abs());
   }
 }
+
+/*
+  This function is fired when the funding of a pool is recomputed
+  We are storing the position with index for future reference
+*/
 export function handleFundingRecomputed(event: FundingRecomputedEvent): void {
   const marketAddress = dataSource.address();
   const fundingRate = event.params.funding;
@@ -228,6 +255,16 @@ export function handleFundingRecomputed(event: FundingRecomputedEvent): void {
   fundingRateEntity.save();
   pool.setFundingRate([bigIntToBigDecimal(fundingRate)]);
 }
+
+/*
+ This function is first when a position of a account is modified, in the following cases:
+  1. A new position is created
+  2. An existing position changes side, ex : LONG becomes SHORT, or SHORT becomes LONG
+  3. An existing position is on same side just increase or decrease in the size
+  4. A position is closed
+  5. A position is liquidated
+  
+ */
 export function handlePositionModified(event: PositionModifiedEvent): void {
   const marketAddress = dataSource.address();
   const sdk = SDK.initializeFromEvent(
@@ -256,6 +293,8 @@ export function handlePositionModified(event: PositionModifiedEvent): void {
 
   const token = sdk.Tokens.getOrCreateToken(NetworkConfigs.getSUSDAddress());
   const isLong = event.params.size.gt(BIGINT_ZERO);
+
+  // loading account last position in this pool, otherwise create new one
   const position = sdk.Positions.loadPosition(
     pool,
     account,
@@ -269,6 +308,7 @@ export function handlePositionModified(event: PositionModifiedEvent): void {
 
   const positionData = position.position;
 
+  // tradeSize == 0 if margin transferred or position liquidated (both these events are not checked here)
   if (event.params.tradeSize.gt(BIGINT_ZERO)) {
     const previousFunding = _FundingRate.load(
       getFundingRateId(pool, positionData.fundingIndex)
@@ -282,11 +322,12 @@ export function handlePositionModified(event: PositionModifiedEvent): void {
 
     const positionSize = event.params.size;
 
+    // position closed
     if (isClose) {
       const pnl = event.params.lastPrice
         .minus(positionData.price)
         .times(positionSize)
-        .minus(fundingAccrued)
+        .plus(fundingAccrued)
         .minus(fees);
 
       const totalMarginRemaining = event.params.margin;
@@ -311,11 +352,12 @@ export function handlePositionModified(event: PositionModifiedEvent): void {
       const positionTotalPrice = event.params.lastPrice.times(positionSize);
       const leverage = positionTotalPrice.div(totalMarginRemaining);
 
+      // if this an exisitin position we close the exisitng position and open a new one in the same pool with PositionCounter + 1
       if (newPosition.getBytesID() != position.getBytesID()) {
         const pnl = event.params.lastPrice
           .minus(positionData.price)
           .times(positionSize)
-          .minus(fundingAccrued)
+          .plus(fundingAccrued)
           .minus(fees);
         position.setBalanceClosed(token, totalMarginRemaining);
         position.setCollateralBalanceClosed(token, totalMarginRemaining);
@@ -341,6 +383,10 @@ export function handlePositionModified(event: PositionModifiedEvent): void {
   pool.addRevenueByToken(token, BIGINT_ZERO, fees);
 }
 
+/*
+  This function is fired when a position is modified in v2 markets, 
+  everything else similar to v1 market position modified event
+*/
 export function handlePositionModifiedV2(event: PositionModifiedV2Event): void {
   const v1Params = event.parameters.filter((value) => {
     return value.name !== "skew";
@@ -359,7 +405,38 @@ export function handlePositionModifiedV2(event: PositionModifiedV2Event): void {
   handlePositionModified(v1Event);
 }
 
+/* 
+  This function is fired when a position is liquidated in v1 market
+*/
 export function handlePositionLiquidated(event: PositionLiquidatedEvent): void {
+  liquidation(
+    event,
+    event.params.account,
+    event.params.liquidator,
+    event.params.fee
+  );
+}
+
+/* 
+  This function is fired when a position is liquidated in v2 market
+*/
+export function handlePositionLiquidatedV2(
+  event: PositionLiquidatedV2Event
+): void {
+  let totalFee = event.params.flaggerFee
+    .plus(event.params.liquidatorFee)
+    .plus(event.params.stakersFee);
+
+  liquidation(event, event.params.account, event.params.liquidator, totalFee);
+}
+
+// common liquidation logic
+function liquidation(
+  event: ethereum.Event,
+  sendingAccount: Address,
+  liquidator: Address,
+  totalFees: BigInt
+): void {
   const sdk = SDK.initializeFromEvent(
     conf,
     new Pricer(),
@@ -367,7 +444,6 @@ export function handlePositionLiquidated(event: PositionLiquidatedEvent): void {
     event
   );
   const pool = sdk.Pools.loadPool(dataSource.address());
-  let sendingAccount = event.params.account;
   let smartMarginAccount = _SmartMarginAccount.load(sendingAccount.toHex());
   const accountAddress = smartMarginAccount
     ? Address.fromBytes(smartMarginAccount.owner)
@@ -392,15 +468,13 @@ export function handlePositionLiquidated(event: PositionLiquidatedEvent): void {
     true
   );
 
-  const pnl = position
-    .getRealisedPnlUsd()
-    .minus(position.position.collateralBalanceUSD);
+  const pnl = position.getRealisedPnlUsd().minus(bigIntToBigDecimal(totalFees));
   account.liquidate(
     pool,
     Address.fromBytes(token.id),
     Address.fromBytes(token.id),
     position.position.collateralBalance,
-    event.params.liquidator,
+    liquidator,
     accountAddress,
     position.getBytesID(),
     pnl
