@@ -270,10 +270,6 @@ templates:
           handler: 'handlePositionLiquidated'
         - event: 'PositionLiquidated(uint256,address,address,int256,uint256,uint256,uint256,uint256)'
           handler: 'handlePositionLiquidatedV2'
-        - event: 'DelayedOrderSubmitted(indexed address,bool,int256,uint256,uint256,uint256,uint256,uint256,bytes32)'
-          handler: 'handleDelayedOrderSubmitted'
-        - event: 'DelayedOrderRemoved(indexed address,bool,uint256,int256,uint256,uint256,uint256,bytes32)'
-          handler: 'handleDelayedOrderRemoved'
         - event: 'FundingRecomputed(int256,int256,uint256,uint256)'
           handler: 'handleFundingRecomputed'
       file: ./src/mappings/handlers.ts
