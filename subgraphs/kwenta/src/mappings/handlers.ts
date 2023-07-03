@@ -7,7 +7,7 @@ import {
   Token,
   _FundingRate,
 } from "../../generated/schema";
-import { _ERC20 } from "../../generated/FuturesMarketManager1/_ERC20";
+import { _ERC20 } from "../../generated/FuturesMarketManager2/_ERC20";
 import {
   Address,
   BigDecimal,
@@ -37,7 +37,7 @@ import {
 import {
   MarketAdded as MarketAddedEvent,
   MarketRemoved,
-} from "../../generated/FuturesMarketManager1/FuturesMarketManager";
+} from "../../generated/FuturesMarketManager2/FuturesMarketManager";
 import {
   FundingRecomputed as FundingRecomputedEvent,
   MarginTransferred as MarginTransferredEvent,
@@ -45,6 +45,7 @@ import {
   PositionModified as PositionModifiedEvent,
 } from "../../generated/templates/FuturesV1Market/FuturesMarket";
 import {
+  PerpsV2MarketProxyable,
   PositionLiquidated1 as PositionLiquidatedV2Event,
   PositionModified1 as PositionModifiedV2Event,
 } from "../../generated/templates/PerpsV2Market/PerpsV2MarketProxyable";
@@ -177,8 +178,8 @@ export function handleNewAccountSmartMargin(
 }
 
 /*
- This function is fired when a Margin (Collateral) is transferred from or to a market position of an account.
- If marginDelta > 0 then it is "collateral in", else it is "collateral out".
+ This function is fired when a Margin is transferred from or to a market position of an account.
+ If marginDelta > 0 then it is "deposit", else it is "withdraw".
 */
 export function handleMarginTransferred(event: MarginTransferredEvent): void {
   let marketAddress = dataSource.address();
@@ -202,31 +203,23 @@ export function handleMarginTransferred(event: MarginTransferredEvent): void {
     pool.addUser();
   }
   const amounts = createTokenAmountArray(pool, [token], [marginDelta.abs()]);
-
-  // loading the last position of the account in this pool, if no position exists create a new one
-  const position = sdk.Positions.loadPosition(
-    pool,
-    account,
-    token,
-    token,
-    "",
-    null,
-    true
-  );
-
-  // Collateral In
+  // Deposit
   if (marginDelta.gt(BIGINT_ZERO)) {
-    account.collateralIn(pool, position.getBytesID(), amounts, BIGINT_ZERO);
-    position.addCollateralInCount();
+    // account.deposit(pool, amounts, BIGINT_ZERO);
     pool.addInflowVolumeByToken(token, marginDelta.abs());
-    pool.addVolumeByToken(token, marginDelta.abs());
+
+    pool.addInputTokenBalances(amounts);
   }
-  // Collateral Out
+  // Withdraw
   if (marginDelta.lt(BIGINT_ZERO)) {
-    account.collateralOut(pool, position.getBytesID(), amounts, BIGINT_ZERO);
-    position.addCollateralOutCount();
+    // account.collateralIn(pool, amounts, BIGINT_ZERO);
+    // account.withdraw(pool, amounts, BIGINT_ZERO);
+
     pool.addOutflowVolumeByToken(token, marginDelta.abs());
-    pool.addVolumeByToken(token, marginDelta.abs());
+
+    pool.addInputTokenBalances(
+      amounts.map<BigInt>((amount) => amount.times(BIGINT_MINUS_ONE))
+    );
   }
 }
 
@@ -246,10 +239,7 @@ export function handleFundingRecomputed(event: FundingRecomputedEvent): void {
   );
   const pool = sdk.Pools.loadPool(marketAddress);
   let fundingRateEntity = new _FundingRate(
-    pool
-      .getBytesID()
-      .concat(Bytes.fromUTF8("-"))
-      .concatI32(event.params.index.toI32())
+    getFundingRateId(pool, event.params.index)
   );
   fundingRateEntity.funding = event.params.funding;
   fundingRateEntity.save();
@@ -263,7 +253,6 @@ export function handleFundingRecomputed(event: FundingRecomputedEvent): void {
   3. An existing position is on same side just increase or decrease in the size
   4. A position is closed
   5. A position is liquidated
-  
  */
 export function handlePositionModified(event: PositionModifiedEvent): void {
   const marketAddress = dataSource.address();
@@ -292,92 +281,127 @@ export function handlePositionModified(event: PositionModifiedEvent): void {
   }
 
   const token = sdk.Tokens.getOrCreateToken(NetworkConfigs.getSUSDAddress());
-  const isLong = event.params.size.gt(BIGINT_ZERO);
 
-  // loading account last position in this pool, otherwise create new one
-  const position = sdk.Positions.loadPosition(
-    pool,
-    account,
-    token,
-    token,
-    isLong ? PositionSide.LONG : PositionSide.SHORT,
-    event,
-    true
-  );
   const fees = event.params.fee;
 
-  const positionData = position.position;
-
-  // tradeSize == 0 if margin transferred or position liquidated (both these events are not checked here)
+  /* if tradeSize == 0 then either margin transferred or position liquidated 
+   (both these events are not checked here) */
   if (event.params.tradeSize.gt(BIGINT_ZERO)) {
+    // loading account last position in this pool, otherwise create new one
+    const isLong = event.params.size.gt(BIGINT_ZERO);
+    const positionResponse = sdk.Positions.loadPosition(
+      pool,
+      account,
+      token,
+      token,
+      isLong ? PositionSide.LONG : PositionSide.SHORT,
+      event,
+      true
+    );
+
+    // fetching market size for testing
+    let contract = PerpsV2MarketProxyable.bind(marketAddress);
+
+    let marketSizeCall = contract.try_marketSize();
+    let marketSkewCall = contract.try_marketSkew();
+    if (!marketSizeCall.reverted && !marketSkewCall.reverted) {
+      let marketSize = marketSizeCall.value;
+      let marketSkew = marketSkewCall.value;
+      pool.pool.marketSize = marketSize;
+      pool.pool.marketSkew = marketSkew;
+      pool.pool.save();
+    }
+
+    const position = positionResponse.position;
+    const newPositionSize = event.params.size;
+    const oldPositionSize = position.getSize();
+    const oldPositionPrice = position.getPrice();
+
+    let fundingAccrued = BIGINT_ZERO;
+    let currentFundingRate = BIGINT_ZERO;
+
     const previousFunding = _FundingRate.load(
-      getFundingRateId(pool, positionData.fundingIndex)
-    )!;
-    const currentFunding = _FundingRate.load(
+      getFundingRateId(pool, position.getFundingIndex())
+    );
+    let currentFunding = _FundingRate.load(
       getFundingRateId(pool, event.params.fundingIndex)
-    )!;
-    const fundingAccrued = currentFunding.funding
-      .minus(previousFunding.funding)
-      .times(positionData.size);
+    );
 
-    const positionSize = event.params.size;
+    if (currentFunding != null) {
+      currentFundingRate = currentFunding.funding;
+    }
+    if (
+      position.getFundingIndex() != event.params.fundingIndex &&
+      currentFunding &&
+      previousFunding
+    ) {
+      fundingAccrued = currentFunding.funding
+        .minus(previousFunding.funding)
+        .times(oldPositionSize)
+        .div(BigInt.fromI32(10).pow(18));
+    }
 
+    let shortInterestUpdate = BIGINT_ZERO;
+    let longInterestUpdate = BIGINT_ZERO;
     // position closed
     if (isClose) {
-      const pnl = event.params.lastPrice
-        .minus(positionData.price)
-        .times(positionSize)
-        .plus(fundingAccrued)
-        .minus(fees);
-
-      const totalMarginRemaining = event.params.margin;
-
-      position.setBalanceClosed(token, totalMarginRemaining);
-      position.setCollateralBalanceClosed(token, totalMarginRemaining);
-      position.setRealisedPnlClosed(token, pnl);
-      position.setFundingrateClosed(bigIntToBigDecimal(currentFunding.funding));
-      position.closePosition();
-    } else {
-      const newPosition = sdk.Positions.loadPosition(
-        pool,
-        account,
-        token,
-        token,
-        isLong ? PositionSide.LONG : PositionSide.SHORT,
-        event,
-        false
-      );
-      const totalMarginRemaining = event.params.margin;
-
-      const positionTotalPrice = event.params.lastPrice.times(positionSize);
-      const leverage = positionTotalPrice.div(totalMarginRemaining);
-
-      // if this an exisitin position we close the exisitng position and open a new one in the same pool with PositionCounter + 1
-      if (newPosition.getBytesID() != position.getBytesID()) {
+      if (!positionResponse.isNewPosition) {
         const pnl = event.params.lastPrice
-          .minus(positionData.price)
-          .times(positionSize)
+          .minus(oldPositionPrice)
+          .times(oldPositionSize)
+          .div(BigInt.fromI32(10).pow(18))
           .plus(fundingAccrued)
           .minus(fees);
+
+        if (oldPositionSize.gt(BIGINT_ZERO)) {
+          longInterestUpdate = longInterestUpdate.minus(oldPositionSize.abs());
+        } else {
+          shortInterestUpdate = shortInterestUpdate.minus(
+            oldPositionSize.abs()
+          );
+        }
+        const totalMarginRemaining = event.params.margin;
         position.setBalanceClosed(token, totalMarginRemaining);
         position.setCollateralBalanceClosed(token, totalMarginRemaining);
-        position.setRealisedPnlClosed(token, pnl);
-        position.setFundingrateClosed(
-          bigIntToBigDecimal(currentFunding.funding)
-        );
-        position.setFundingrateClosed(
-          bigIntToBigDecimal(currentFunding.funding)
-        );
+        position.setRealisedPnlUsdClosed(bigIntToBigDecimal(pnl));
+        position.setFundingrateClosed(bigIntToBigDecimal(currentFundingRate));
         position.closePosition();
       }
+    } else {
+      const totalMarginRemaining = event.params.margin;
 
-      newPosition.setBalance(token, totalMarginRemaining);
-      newPosition.setCollateralBalance(token, totalMarginRemaining);
-      newPosition.setPrice(event.params.lastPrice);
-      newPosition.setSize(event.params.size);
-      newPosition.setFundingIndex(event.params.fundingIndex);
-      newPosition.setLeverage(bigIntToBigDecimal(leverage));
+      const positionTotalPrice = event.params.lastPrice.times(newPositionSize);
+      const leverage = positionTotalPrice.div(totalMarginRemaining);
+
+      if (isLong) {
+        longInterestUpdate = longInterestUpdate.plus(newPositionSize.abs());
+      } else {
+        shortInterestUpdate = shortInterestUpdate.plus(newPositionSize.abs());
+      }
+      if (!positionResponse.isNewPosition) {
+        if (oldPositionSize.gt(BIGINT_ZERO)) {
+          longInterestUpdate = longInterestUpdate.minus(oldPositionSize.abs());
+        } else {
+          shortInterestUpdate = shortInterestUpdate.minus(
+            oldPositionSize.abs()
+          );
+        }
+      }
+      position.setBalance(token, totalMarginRemaining);
+      position.setCollateralBalance(token, totalMarginRemaining);
+      position.setPrice(event.params.lastPrice);
+      position.setSize(event.params.size);
+      position.setFundingIndex(event.params.fundingIndex);
+      position.setLeverage(bigIntToBigDecimal(leverage));
     }
+
+    pool.updateLongOpenInterest(longInterestUpdate, event.params.lastPrice);
+    pool.updateShortOpenInterest(shortInterestUpdate, event.params.lastPrice);
+    const volume = event.params.lastPrice
+      .times(newPositionSize)
+      .div(BigInt.fromI32(10).pow(18))
+      .abs();
+    pool.addVolumeByToken(token, volume);
   }
 
   pool.addRevenueByToken(token, BIGINT_ZERO, fees);
@@ -458,29 +482,39 @@ function liquidation(
   }
   const token = sdk.Tokens.getOrCreateToken(NetworkConfigs.getSUSDAddress());
 
-  const position = sdk.Positions.loadPosition(
-    pool,
-    account,
-    token,
-    token,
-    "",
-    null,
-    true
-  );
+  const position = sdk.Positions.loadLastPosition(pool, account, token, token);
+  if (position != null) {
+    const oldPositionSize = position.getSize();
+    const oldPositionPrice = position.getPrice();
 
-  const pnl = position.getRealisedPnlUsd().minus(bigIntToBigDecimal(totalFees));
-  account.liquidate(
-    pool,
-    Address.fromBytes(token.id),
-    Address.fromBytes(token.id),
-    position.position.collateralBalance,
-    liquidator,
-    accountAddress,
-    position.getBytesID(),
-    pnl
-  );
-  position.addLiquidationCount();
-  position.setBalanceClosed(token, BIGINT_ZERO);
-  position.setCollateralBalanceClosed(token, BIGINT_ZERO);
-  position.setRealisedPnlUsdClosed(pnl);
+    if (oldPositionSize.gt(BIGINT_ZERO)) {
+      pool.updateLongOpenInterest(
+        oldPositionSize.abs().times(BIGINT_MINUS_ONE),
+        oldPositionPrice
+      );
+    } else {
+      pool.updateShortOpenInterest(
+        oldPositionSize.abs().times(BIGINT_MINUS_ONE),
+        oldPositionPrice
+      );
+    }
+    const pnl = position
+      .getRealisedPnlUsd()
+      .minus(bigIntToBigDecimal(totalFees));
+    account.liquidate(
+      pool,
+      Address.fromBytes(token.id),
+      Address.fromBytes(token.id),
+      position.position.collateralBalance,
+      liquidator,
+      accountAddress,
+      position.getBytesID(),
+      pnl
+    );
+    position.addLiquidationCount();
+    position.setBalanceClosed(token, BIGINT_ZERO);
+    position.setCollateralBalanceClosed(token, BIGINT_ZERO);
+    position.setRealisedPnlUsdClosed(pnl);
+    position.closePosition();
+  }
 }

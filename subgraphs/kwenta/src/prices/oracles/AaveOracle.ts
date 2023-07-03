@@ -2,7 +2,7 @@ import * as utils from "../common/utils";
 import * as constants from "../common/constants";
 import { CustomPriceType, OracleContract } from "../common/types";
 import { Address, BigDecimal, BigInt, ethereum } from "@graphprotocol/graph-ts";
-import { AaveOracleContract } from "../../../generated/FuturesMarketManager1/AaveOracleContract";
+import { AaveOracleContract } from "../../../generated/FuturesMarketManager2/AaveOracleContract";
 
 export function getAaveOracleContract(
   contract: OracleContract,

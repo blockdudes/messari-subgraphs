@@ -130,10 +130,12 @@ export class Perpetual {
     protocol.subgraphVersion = versions.getSubgraphVersion();
     protocol.methodologyVersion = versions.getMethodologyVersion();
 
+    const proto = new Perpetual(protocol, pricer, event);
+
     protocol._lastUpdateTimestamp = event.block.timestamp;
     protocol.save();
 
-    return new Perpetual(protocol, pricer, event);
+    return proto;
   }
 
   /**

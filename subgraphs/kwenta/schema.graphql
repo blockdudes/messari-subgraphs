@@ -861,6 +861,13 @@ type LiquidityPool @entity {
 
   " Timestamp of the last time this entity was updated "
   _lastUpdateTimestamp: BigInt
+
+  longOpenInterest: BigInt!
+  shortOpenInterest: BigInt!
+  totalOpenInterest: BigInt!
+
+  marketSize: BigInt
+  marketSkew: BigInt
 }
 
 #################################
@@ -1103,6 +1110,13 @@ type LiquidityPoolDailySnapshot @entity {
 
   " Per-block reward token emission as of the current block normalized to a day, in USD value. This should be ideally calculated as the theoretical rate instead of the realized amount. "
   rewardTokenEmissionsUSD: [BigDecimal!]
+
+  longOpenInterest: BigInt!
+  shortOpenInterest: BigInt!
+  totalOpenInterest: BigInt!
+
+  marketSize: BigInt
+  marketSkew: BigInt
 }
 
 type LiquidityPoolHourlySnapshot @entity {
@@ -1281,6 +1295,13 @@ type LiquidityPoolHourlySnapshot @entity {
 
   " Per-block reward token emission as of the current block normalized to a day (not hour), in USD value. This should be ideally calculated as the theoretical rate instead of the realized amount. "
   rewardTokenEmissionsUSD: [BigDecimal!]
+
+  longOpenInterest: BigInt!
+  shortOpenInterest: BigInt!
+  totalOpenInterest: BigInt!
+
+  marketSize: BigInt
+  marketSkew: BigInt
 }
 
 ##################################
@@ -1869,6 +1890,8 @@ type Position @entity {
   fundingIndex: BigInt!
 
   size: BigInt!
+
+  isClosed: Boolean!
 }
 
 type PositionSnapshot @entity(immutable: true) {

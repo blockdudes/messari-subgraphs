@@ -1,13 +1,7 @@
 {
   "deployment": "KWENTA_OPTIMISM",
   "network": "optimism",
-  "marketManagerV1": [
-    {
-      "name": "FuturesMarketManager1",
-      "address": "0xc704c9AA89d1ca60F67B3075d05fBb92b3B00B3B",
-      "startBlock": 4552546
-    }
-  ],
+  "marketManagerV1": [],
   "marketManagerV2": [
     {
       "name": "FuturesMarketManager2",

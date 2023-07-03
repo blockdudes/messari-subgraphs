@@ -4,8 +4,8 @@ import { BigDecimal, BigInt } from "@graphprotocol/graph-ts";
 ///// Versions /////
 ////////////////////
 
-export const PROTOCOL_NAME = "Uniswap v2";
-export const PROTOCOL_SLUG = "uniswap-v2";
+export const PROTOCOL_NAME = "Kwenta";
+export const PROTOCOL_SLUG = "kwenta";
 
 ////////////////////////
 ///// Schema Enums /////
@@ -169,7 +169,7 @@ export const ETH_NAME = "Ether";
 ///// Protocol Specific /////
 /////////////////////////////
 
-export const FACTORY_ADDRESS = "0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f";
+export const FACTORY_ADDRESS = "0x920Cf626a271321C151D027030D5d08aF699456b";
 export const TRADING_FEE = BigDecimal.fromString("3");
 export const PROTOCOL_FEE_TO_ON = BigDecimal.fromString("0.5");
 export const LP_FEE_TO_ON = BigDecimal.fromString("2.5");

@@ -59,10 +59,10 @@ export class PoolSnapshot {
   }
 
   private isInitialized(): boolean {
-    log.error(
-      "[isInitialized] cannot create snapshots, pool: {} not initialized",
-      [this.pool.id.toHexString()]
-    );
+    // log.error(
+    //   "[isInitialized] cannot create snapshots, pool: {} not initialized",
+    //   [this.pool.id.toHexString()]
+    // );
 
     return this.pool._lastSnapshotDayID &&
       this.pool._lastSnapshotHourID &&
@@ -266,6 +266,12 @@ export class PoolSnapshot {
     snapshot.rewardTokenEmissionsAmount = this.pool.rewardTokenEmissionsAmount;
     snapshot.rewardTokenEmissionsUSD = this.pool.rewardTokenEmissionsUSD;
 
+    snapshot.marketSize = this.pool.marketSize;
+    snapshot.marketSkew = this.pool.marketSkew;
+
+    snapshot.longOpenInterest = this.pool.longOpenInterest;
+    snapshot.shortOpenInterest = this.pool.shortOpenInterest;
+    snapshot.totalOpenInterest = this.pool.totalOpenInterest;
     snapshot.save();
   }
 
@@ -524,7 +530,11 @@ export class PoolSnapshot {
     snapshot.stakedOutputTokenAmount = this.pool.stakedOutputTokenAmount;
     snapshot.rewardTokenEmissionsAmount = this.pool.rewardTokenEmissionsAmount;
     snapshot.rewardTokenEmissionsUSD = this.pool.rewardTokenEmissionsUSD;
-
+    snapshot.marketSize = this.pool.marketSize;
+    snapshot.marketSkew = this.pool.marketSkew;
+    snapshot.longOpenInterest = this.pool.longOpenInterest;
+    snapshot.shortOpenInterest = this.pool.shortOpenInterest;
+    snapshot.totalOpenInterest = this.pool.totalOpenInterest;
     snapshot.save();
   }
 }

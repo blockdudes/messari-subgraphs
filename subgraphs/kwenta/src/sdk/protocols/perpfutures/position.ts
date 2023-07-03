@@ -1,4 +1,4 @@
-import { BigDecimal, BigInt, Bytes } from "@graphprotocol/graph-ts";
+import { BigDecimal, BigInt, Bytes, log } from "@graphprotocol/graph-ts";
 
 import { Pool } from "./pool";
 import { Account } from "./account";
@@ -25,7 +25,15 @@ import { PositionModified } from "../../../../generated/templates/FuturesV1Marke
  *  - @harsh9200
  *  - @dhruv-chauhan
  */
+class LoadPositionResponse {
+  position: Position;
+  isNewPosition: boolean;
 
+  constructor(position: Position, isNewPosition: boolean) {
+    this.position = position;
+    this.isNewPosition = isNewPosition;
+  }
+}
 export class PositionManager {
   protocol: Perpetual;
   tokens: TokenManager;
@@ -38,51 +46,69 @@ export class PositionManager {
   getPositionId(
     pool: Pool,
     account: Account,
-    positionSide: constants.PositionSide,
     getLastPosition: bool = false
   ): Bytes {
     const positionId = account
       .getBytesId()
       .concat(Bytes.fromUTF8("-"))
       .concat(pool.getBytesID());
-    // .concat(Bytes.fromUTF8("-"))
-    // .concat(Bytes.fromUTF8(positionSide));
 
     let positionCounter = _PositionCounter.load(positionId);
     if (!positionCounter) {
       positionCounter = new _PositionCounter(positionId);
       positionCounter.nextCount = 0;
       positionCounter.save();
-    } else {
-      if (!getLastPosition) {
-        positionCounter.nextCount += 1;
-        positionCounter.save();
-      }
+    } else if (!getLastPosition) {
+      positionCounter.nextCount += 1;
+      positionCounter.save();
     }
 
     return positionCounter.id
       .concat(Bytes.fromUTF8("-"))
       .concatI32(positionCounter.nextCount);
   }
-
+  loadLastPosition(
+    pool: Pool,
+    account: Account,
+    asset: Token,
+    collateral: Token
+  ): Position | null {
+    const positionId = this.getPositionId(pool, account, true);
+    let entity = PositionSchema.load(positionId);
+    if (entity != null) {
+      return new Position(
+        this.protocol,
+        this.tokens,
+        pool,
+        account,
+        entity,
+        true
+      );
+    }
+    return null;
+  }
   loadPosition(
     pool: Pool,
     account: Account,
     asset: Token,
     collateral: Token,
     positionSide: constants.PositionSide,
-    eventPosition: PositionModified | null,
+    eventPosition: PositionModified,
     getLastPosition: bool = false
-  ): Position {
-    const positionId = this.getPositionId(
-      pool,
-      account,
-      positionSide,
-      getLastPosition
-    );
-    let openPosition = !getLastPosition;
+  ): LoadPositionResponse {
+    let positionId = this.getPositionId(pool, account, getLastPosition);
+    let openPosition = false;
     let entity = PositionSchema.load(positionId);
 
+    // if entity.hashClosed is not null that means last position is closed, and we have to open a new position
+    if (entity != null && entity.isClosed) {
+      log.error("hashclosed : {}", [entity.isClosed.toString()]);
+
+      positionId = this.getPositionId(pool, account, false);
+
+      entity = null;
+      openPosition = true;
+    }
     if (!entity) {
       openPosition = true;
       entity = new PositionSchema(positionId);
@@ -109,33 +135,15 @@ export class PositionManager {
       entity.collateralInCount = 0;
       entity.collateralOutCount = 0;
       entity.liquidationCount = 0;
-      if (eventPosition != null) {
-        entity.price = eventPosition.params.lastPrice;
-        entity.fundingIndex = eventPosition.params.fundingIndex;
-        entity.size = eventPosition.params.size;
-      } else {
-        entity.price = constants.BIGINT_ZERO;
-        entity.fundingIndex = constants.BIGINT_ZERO;
-        entity.size = constants.BIGINT_ZERO;
-      }
+
+      entity.price = eventPosition.params.lastPrice;
+      entity.fundingIndex = eventPosition.params.fundingIndex;
+      entity.size = eventPosition.params.size;
+      entity.isClosed = false;
 
       entity.save();
-    } else {
-      if (
-        eventPosition != null &&
-        entity.fundingIndex.equals(constants.BIGINT_ZERO) &&
-        entity.price.equals(constants.BIGINT_ZERO) &&
-        entity.size.equals(constants.BIGINT_ZERO)
-      ) {
-        entity.price = eventPosition.params.lastPrice;
-        entity.fundingIndex = eventPosition.params.fundingIndex;
-        entity.size = eventPosition.params.size;
-        entity.side = positionSide;
-        entity.save();
-      }
     }
-
-    return new Position(
+    const position = new Position(
       this.protocol,
       this.tokens,
       pool,
@@ -143,6 +151,8 @@ export class PositionManager {
       entity,
       openPosition
     );
+
+    return new LoadPositionResponse(position, openPosition);
   }
 }
 
@@ -182,6 +192,18 @@ export class Position {
       : constants.BIGDECIMAL_ZERO;
   }
 
+  getFundingIndex(): BigInt {
+    return this.position.fundingIndex;
+  }
+
+  getSize(): BigInt {
+    return this.position.size;
+  }
+
+  getPrice(): BigInt {
+    return this.position.price;
+  }
+
   private save(): void {
     this.position.save();
     this.takePositionSnapshot();
@@ -198,6 +220,7 @@ export class Position {
     this.position.hashClosed = event.transaction.hash;
     this.position.blockNumberClosed = event.block.number;
     this.position.timestampClosed = event.block.timestamp;
+    this.position.isClosed = true;
     this.save();
 
     this.account.closePosition(this.position.side);

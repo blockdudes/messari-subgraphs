@@ -30,5 +30,5 @@ export function getFundingRateId(pool: Pool, fundingIndex: BigInt): Bytes {
   return pool
     .getBytesID()
     .concat(Bytes.fromUTF8("-"))
-    .concatI32(fundingIndex.toI32());
+    .concat(Bytes.fromByteArray(Bytes.fromBigInt(fundingIndex)));
 }

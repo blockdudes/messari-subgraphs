@@ -11,7 +11,7 @@ import { Perpetual } from "./protocol";
 import { TokenManager } from "./tokens";
 import { PoolSnapshot } from "./poolSnapshot";
 import * as constants from "../../util/constants";
-import { exponentToBigDecimal } from "../../util/numbers";
+import { bigIntToBigDecimal, exponentToBigDecimal } from "../../util/numbers";
 
 import {
   LiquidityPoolFee,
@@ -178,6 +178,9 @@ export class Pool {
     this.pool._lastSnapshotHourID = constants.BIGINT_ZERO;
     this.pool._lastUpdateTimestamp = event.block.timestamp;
 
+    this.pool.longOpenInterest = constants.BIGINT_ZERO;
+    this.pool.shortOpenInterest = constants.BIGINT_ZERO;
+    this.pool.totalOpenInterest = constants.BIGINT_ZERO;
     this.save();
 
     this.protocol.addPool();
@@ -437,6 +440,51 @@ export class Pool {
    *
    * @param amountChangeUSD {BigDecimal} The value to add to the pool's openInterest in USD.
    */
+
+  updateLongOpenInterest(amountChange: BigInt, price: BigInt): void {
+    const longOpenInterest = this.pool.longOpenInterest.plus(amountChange);
+    const totalOpenInterest = this.pool.totalOpenInterest.plus(amountChange);
+
+    this.pool.totalOpenInterest = totalOpenInterest;
+    this.pool.longOpenInterest = longOpenInterest;
+
+    const longOpenInterestUSD = bigIntToBigDecimal(longOpenInterest).times(
+      bigIntToBigDecimal(price)
+    );
+    const totalOpenInterestUSD = bigIntToBigDecimal(totalOpenInterest).times(
+      bigIntToBigDecimal(price)
+    );
+    const amountChangeUSD = longOpenInterestUSD.minus(
+      this.pool.longOpenInterestUSD
+    );
+
+    this.pool.totalOpenInterestUSD = totalOpenInterestUSD;
+    this.pool.longOpenInterestUSD = longOpenInterestUSD;
+    this.save();
+    this.protocol.updateLongOpenInterestUSD(amountChangeUSD);
+  }
+
+  updateShortOpenInterest(amountChange: BigInt, price: BigInt): void {
+    const shortOpenInterest = this.pool.shortOpenInterest.plus(amountChange);
+    const totalOpenInterest = this.pool.totalOpenInterest.plus(amountChange);
+
+    this.pool.totalOpenInterest = totalOpenInterest;
+    this.pool.shortOpenInterest = shortOpenInterest;
+    const shortOpenInterestUSD = bigIntToBigDecimal(shortOpenInterest).times(
+      bigIntToBigDecimal(price)
+    );
+    const totalOpenInterestUSD = bigIntToBigDecimal(totalOpenInterest).times(
+      bigIntToBigDecimal(price)
+    );
+    const amountChangeUSD = shortOpenInterestUSD.minus(
+      this.pool.shortOpenInterestUSD
+    );
+
+    this.pool.totalOpenInterestUSD = totalOpenInterestUSD;
+    this.pool.shortOpenInterestUSD = shortOpenInterestUSD;
+    this.save();
+    this.protocol.updateShortOpenInterestUSD(amountChangeUSD);
+  }
   updateLongOpenInterestUSD(amountChangeUSD: BigDecimal): void {
     this.pool.totalOpenInterestUSD =
       this.pool.totalOpenInterestUSD.plus(amountChangeUSD);
