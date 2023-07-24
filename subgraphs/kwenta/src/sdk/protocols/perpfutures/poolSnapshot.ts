@@ -45,16 +45,22 @@ export class PoolSnapshot {
     const snapshotHourID =
       this.pool._lastUpdateTimestamp!.toI32() / constants.SECONDS_PER_HOUR;
 
-    if (snapshotDayID != this.dayID) {
+    if (
+      snapshotDayID != this.dayID &&
+      this.pool._lastSnapshotDayID!.toI32() != snapshotDayID
+    ) {
+      this.takeDailySnapshot(snapshotDayID);
       this.pool._lastSnapshotDayID = BigInt.fromI32(snapshotDayID);
       this.pool.save();
-      this.takeDailySnapshot(snapshotDayID);
     }
 
-    if (snapshotHourID != this.hourID) {
+    if (
+      snapshotHourID != this.hourID &&
+      this.pool._lastSnapshotHourID!.toI32() != snapshotHourID
+    ) {
+      this.takeHourlySnapshot(snapshotHourID);
       this.pool._lastSnapshotHourID = BigInt.fromI32(snapshotHourID);
       this.pool.save();
-      this.takeHourlySnapshot(snapshotHourID);
     }
   }
 

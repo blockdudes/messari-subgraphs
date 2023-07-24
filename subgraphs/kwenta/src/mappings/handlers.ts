@@ -101,17 +101,18 @@ export function handleV1MarketAdded(event: MarketAddedEvent): void {
     event
   );
 
-  const pool = sdk.Pools.loadPool(event.params.market);
-  if (!pool.isInitialized) {
-    const token = sdk.Tokens.getOrCreateToken(NetworkConfigs.getSUSDAddress());
-    pool.initialize(marketKey, marketKey, [token], null, "chainlink");
-    // todo: fees
-  }
-
   // check that it's a v1 market before adding
   if (marketKey.startsWith("s") && !marketKey.endsWith("PERP")) {
     log.info("New V1 market added: {}", [marketKey]);
 
+    const pool = sdk.Pools.loadPool(event.params.market);
+    if (!pool.isInitialized) {
+      const token = sdk.Tokens.getOrCreateToken(
+        NetworkConfigs.getSUSDAddress()
+      );
+      pool.initialize(marketKey, marketKey, [token], null, "chainlink");
+      // todo: fees
+    }
     // futures v1 market
     FuturesV1Market.create(event.params.market);
   }
@@ -130,16 +131,18 @@ export function handleV2MarketAdded(event: MarketAddedEvent): void {
     event
   );
 
-  const pool = sdk.Pools.loadPool(event.params.market);
-  if (!pool.isInitialized) {
-    const token = sdk.Tokens.getOrCreateToken(NetworkConfigs.getSUSDAddress());
-    pool.initialize(marketKey, marketKey, [token], null, "chainlink");
-    // todo: fees
-  }
-
   // check that it's a v1 market before adding
   if (marketKey.endsWith("PERP")) {
     log.info("New V2 market added: {}", [marketKey]);
+
+    const pool = sdk.Pools.loadPool(event.params.market);
+    if (!pool.isInitialized) {
+      const token = sdk.Tokens.getOrCreateToken(
+        NetworkConfigs.getSUSDAddress()
+      );
+      pool.initialize(marketKey, marketKey, [token], null, "chainlink");
+      // todo: fees
+    }
 
     // perps v2 market
     PerpsV2Market.create(event.params.market);
@@ -205,15 +208,14 @@ export function handleMarginTransferred(event: MarginTransferredEvent): void {
   const amounts = createTokenAmountArray(pool, [token], [marginDelta.abs()]);
   // Deposit
   if (marginDelta.gt(BIGINT_ZERO)) {
-    // account.deposit(pool, amounts, BIGINT_ZERO);
+    account.deposit(pool, amounts, BIGINT_ZERO);
     pool.addInflowVolumeByToken(token, marginDelta.abs());
 
     pool.addInputTokenBalances(amounts);
   }
   // Withdraw
   if (marginDelta.lt(BIGINT_ZERO)) {
-    // account.collateralIn(pool, amounts, BIGINT_ZERO);
-    // account.withdraw(pool, amounts, BIGINT_ZERO);
+    account.withdraw(pool, amounts, BIGINT_ZERO);
 
     pool.addOutflowVolumeByToken(token, marginDelta.abs());
 
@@ -304,12 +306,11 @@ export function handlePositionModified(event: PositionModifiedEvent): void {
 
     let marketSizeCall = contract.try_marketSize();
     let marketSkewCall = contract.try_marketSkew();
+    let marketSize = BIGINT_ZERO;
+    let marketSkew = BIGINT_ZERO;
     if (!marketSizeCall.reverted && !marketSkewCall.reverted) {
-      let marketSize = marketSizeCall.value;
-      let marketSkew = marketSkewCall.value;
-      pool.pool.marketSize = marketSize;
-      pool.pool.marketSkew = marketSkew;
-      pool.pool.save();
+      marketSize = marketSizeCall.value;
+      marketSkew = marketSkewCall.value;
     }
 
     const position = positionResponse.position;
@@ -341,52 +342,27 @@ export function handlePositionModified(event: PositionModifiedEvent): void {
         .div(BigInt.fromI32(10).pow(18));
     }
 
-    let shortInterestUpdate = BIGINT_ZERO;
-    let longInterestUpdate = BIGINT_ZERO;
     // position closed
     if (isClose) {
-      if (!positionResponse.isNewPosition) {
-        const pnl = event.params.lastPrice
-          .minus(oldPositionPrice)
-          .times(oldPositionSize)
-          .div(BigInt.fromI32(10).pow(18))
-          .plus(fundingAccrued)
-          .minus(fees);
+      const pnl = event.params.lastPrice
+        .minus(oldPositionPrice)
+        .times(oldPositionSize)
+        .div(BigInt.fromI32(10).pow(18))
+        .plus(fundingAccrued)
+        .minus(fees);
 
-        if (oldPositionSize.gt(BIGINT_ZERO)) {
-          longInterestUpdate = longInterestUpdate.minus(oldPositionSize.abs());
-        } else {
-          shortInterestUpdate = shortInterestUpdate.minus(
-            oldPositionSize.abs()
-          );
-        }
-        const totalMarginRemaining = event.params.margin;
-        position.setBalanceClosed(token, totalMarginRemaining);
-        position.setCollateralBalanceClosed(token, totalMarginRemaining);
-        position.setRealisedPnlUsdClosed(bigIntToBigDecimal(pnl));
-        position.setFundingrateClosed(bigIntToBigDecimal(currentFundingRate));
-        position.closePosition();
-      }
+      const totalMarginRemaining = event.params.margin;
+      position.setBalanceClosed(token, totalMarginRemaining);
+      position.setCollateralBalanceClosed(token, totalMarginRemaining);
+      position.setRealisedPnlUsdClosed(bigIntToBigDecimal(pnl));
+      position.setFundingrateClosed(bigIntToBigDecimal(currentFundingRate));
+      position.closePosition();
     } else {
       const totalMarginRemaining = event.params.margin;
 
       const positionTotalPrice = event.params.lastPrice.times(newPositionSize);
       const leverage = positionTotalPrice.div(totalMarginRemaining);
 
-      if (isLong) {
-        longInterestUpdate = longInterestUpdate.plus(newPositionSize.abs());
-      } else {
-        shortInterestUpdate = shortInterestUpdate.plus(newPositionSize.abs());
-      }
-      if (!positionResponse.isNewPosition) {
-        if (oldPositionSize.gt(BIGINT_ZERO)) {
-          longInterestUpdate = longInterestUpdate.minus(oldPositionSize.abs());
-        } else {
-          shortInterestUpdate = shortInterestUpdate.minus(
-            oldPositionSize.abs()
-          );
-        }
-      }
       position.setBalance(token, totalMarginRemaining);
       position.setCollateralBalance(token, totalMarginRemaining);
       position.setPrice(event.params.lastPrice);
@@ -394,9 +370,14 @@ export function handlePositionModified(event: PositionModifiedEvent): void {
       position.setFundingIndex(event.params.fundingIndex);
       position.setLeverage(bigIntToBigDecimal(leverage));
     }
-
-    pool.updateLongOpenInterest(longInterestUpdate, event.params.lastPrice);
-    pool.updateShortOpenInterest(shortInterestUpdate, event.params.lastPrice);
+    const shortOpenInterstAmount = marketSize
+      .minus(marketSkew)
+      .div(BigInt.fromI32(2));
+    const longOpenInterstAmount = marketSize
+      .plus(marketSkew)
+      .div(BigInt.fromI32(2));
+    pool.setLongOpenInterest(longOpenInterstAmount, event.params.lastPrice);
+    pool.setShortOpenInterest(shortOpenInterstAmount, event.params.lastPrice);
     const volume = event.params.lastPrice
       .times(newPositionSize)
       .div(BigInt.fromI32(10).pow(18))

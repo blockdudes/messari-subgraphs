@@ -464,6 +464,55 @@ export class Pool {
     this.protocol.updateLongOpenInterestUSD(amountChangeUSD);
   }
 
+  setLongOpenInterest(amount: BigInt, price: BigInt): void {
+    const longOpenInterest = amount;
+    const totalOpenInterest = this.pool.totalOpenInterest.plus(
+      longOpenInterest.minus(this.pool.longOpenInterest)
+    );
+
+    this.pool.totalOpenInterest = totalOpenInterest;
+    this.pool.longOpenInterest = longOpenInterest;
+
+    const longOpenInterestUSD = bigIntToBigDecimal(longOpenInterest).times(
+      bigIntToBigDecimal(price)
+    );
+    const totalOpenInterestUSD = bigIntToBigDecimal(totalOpenInterest).times(
+      bigIntToBigDecimal(price)
+    );
+    const amountChangeUSD = longOpenInterestUSD.minus(
+      this.pool.longOpenInterestUSD
+    );
+
+    this.pool.totalOpenInterestUSD = totalOpenInterestUSD;
+    this.pool.longOpenInterestUSD = longOpenInterestUSD;
+    this.save();
+    this.protocol.updateLongOpenInterestUSD(amountChangeUSD);
+  }
+
+  setShortOpenInterest(amount: BigInt, price: BigInt): void {
+    const shortOpenInterest = amount;
+    const totalOpenInterest = this.pool.totalOpenInterest.plus(
+      shortOpenInterest.minus(this.pool.shortOpenInterest)
+    );
+
+    this.pool.totalOpenInterest = totalOpenInterest;
+    this.pool.shortOpenInterest = shortOpenInterest;
+    const shortOpenInterestUSD = bigIntToBigDecimal(shortOpenInterest).times(
+      bigIntToBigDecimal(price)
+    );
+    const totalOpenInterestUSD = bigIntToBigDecimal(totalOpenInterest).times(
+      bigIntToBigDecimal(price)
+    );
+    const amountChangeUSD = shortOpenInterestUSD.minus(
+      this.pool.shortOpenInterestUSD
+    );
+
+    this.pool.totalOpenInterestUSD = totalOpenInterestUSD;
+    this.pool.shortOpenInterestUSD = shortOpenInterestUSD;
+    this.save();
+    this.protocol.updateShortOpenInterestUSD(amountChangeUSD);
+  }
+
   updateShortOpenInterest(amountChange: BigInt, price: BigInt): void {
     const shortOpenInterest = this.pool.shortOpenInterest.plus(amountChange);
     const totalOpenInterest = this.pool.totalOpenInterest.plus(amountChange);
